@@ -102,7 +102,7 @@ resource "aws_ecs_task_definition" "frontend_task" {
     environment = [
       {
         name  = "NEXT_PUBLIC_API_URL"
-        value = "http://${aws_lb.app.dns_name}/api"
+        value = "http://${aws_lb.app.dns_name}:${var.backend_port}"
       }
     ]
   }])
