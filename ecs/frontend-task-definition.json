@@ -1,0 +1,22 @@
+{
+  "family": "frontend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::762233750277:role/myapp-ecs-execution-role",
+  "containerDefinitions": [
+    {
+      "name": "frontend",
+      "image": "frontend", 
+      "portMappings": [{ "containerPort": 3000 }],
+      "essential": true,
+      "environment": [
+        {
+          "name": "NEXT_PUBLIC_API_URL",
+          "value": "http://myapp-alb-1020173527.us-east-1.elb.amazonaws.com:8000"
+        }
+      ]
+    }
+  ]
+}

@@ -6,16 +6,17 @@ on:
 
 env:
   IMAGE_TAG: ${{ github.sha }}
+  AWS_REGION: us-east-1
 
 jobs:
-  test-build-push:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    # ----- Python Backend -----
+    # --- Backend (Python) ---
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -30,7 +31,7 @@ jobs:
     - name: Run Backend Unit Tests
       run: PYTHONPATH=backend pytest backend/tests
 
-    # ----- Node Frontend -----
+    # --- Frontend (Node.js) ---
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
@@ -48,40 +49,58 @@ jobs:
       working-directory: frontend
       run: npm run build
 
-    # ----- Docker & Push to ECR -----
+    # --- AWS Auth & ECR Login ---
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        aws-region: ${{ env.AWS_REGION }}
 
     - name: Login to Amazon ECR
       uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build & Push Backend Image (Git SHA Tag)
+    # --- Build & Push Docker Images ---
+    - name: Build & Push Backend Image
       run: |
         docker build -t ${{ secrets.ECR_BACKEND_REPO }}:${{ env.IMAGE_TAG }} ./backend
         docker push ${{ secrets.ECR_BACKEND_REPO }}:${{ env.IMAGE_TAG }}
 
-    - name: Build & Push Frontend Image (Git SHA Tag)
+    - name: Build & Push Frontend Image
       run: |
         docker build -t ${{ secrets.ECR_FRONTEND_REPO }}:${{ env.IMAGE_TAG }} ./frontend
         docker push ${{ secrets.ECR_FRONTEND_REPO }}:${{ env.IMAGE_TAG }}
 
-    # ----- Update ECS Task Definition -----
-    - name: Fill in the new image ID in the Amazon ECS task definition
-      id: task-def
+    # --- Update ECS Task Definitions ---
+    - name: Render Backend Task Definition
+      id: render-backend
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
-        task-definition: nodejs-app-task-definition.json
-        container-name: nodejs-app
+        task-definition: ecs/backend-task-definition.json
+        container-name: backend
+        image: ${{ secrets.ECR_BACKEND_REPO }}:${{ env.IMAGE_TAG }}
+
+    - name: Render Frontend Task Definition
+      id: render-frontend
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ecs/frontend-task-definition.json
+        container-name: frontend
         image: ${{ secrets.ECR_FRONTEND_REPO }}:${{ env.IMAGE_TAG }}
 
-    - name: Deploy Amazon ECS task definition
+    # --- Deploy Updated Services ---
+    - name: Deploy Backend Task to ECS
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
-        task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: nodejs-app-service
+        task-definition: ${{ steps.render-backend.outputs.task-definition }}
+        service: backend
+        cluster: DevCluster
+        wait-for-service-stability: true
+
+    - name: Deploy Frontend Task to ECS
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.render-frontend.outputs.task-definition }}
+        service: frontend
         cluster: DevCluster
         wait-for-service-stability: true
