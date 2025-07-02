@@ -90,7 +90,7 @@ jobs:
       with:
         task-definition: ${{ steps.render-backend.outputs.task-definition }}
         service: backend
-        cluster: DevCluster
+        cluster: myapp-cluster
         wait-for-service-stability: true
 
     - name: Deploy Frontend Task to ECS
@@ -98,5 +98,5 @@ jobs:
       with:
         task-definition: ${{ steps.render-frontend.outputs.task-definition }}
         service: frontend
-        cluster: DevCluster
+        cluster: myapp-cluster
         wait-for-service-stability: true
