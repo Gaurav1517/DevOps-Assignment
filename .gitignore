@@ -1,0 +1,54 @@
+# Node (Frontend)
+node_modules/
+.next/
+out/
+.env
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vscode/
+.DS_Store
+
+# Python (Backend)
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.db
+venv/
+.env
+.env.*
+
+# Docker
+*.tar
+*.log
+
+# Terraform
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# Logs
+*.log
+logs/
+*.pid
+
+# IDEs
+.idea/
+*.swp
+
+# Tests
+coverage/
+*.cover
+*.pyc
+test-results/
+
+# Misc
+*.bak
+*.tmp
+
+# ECR image tags (if manually stored)
+image_tag.txt
