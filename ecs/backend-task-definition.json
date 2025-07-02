@@ -1,0 +1,16 @@
+{
+  "family": "backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::762233750277:role/myapp-ecs-execution-role",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "backend",  
+      "portMappings": [{ "containerPort": 8000 }],
+      "essential": true
+    }
+  ]
+}
