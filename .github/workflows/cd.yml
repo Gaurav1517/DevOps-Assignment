@@ -1,0 +1,87 @@
+name: CD Pipeline
+
+on:
+  push:
+    branches: [main]
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  test-build-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # ----- Python Backend -----
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Backend Dependencies
+      working-directory: backend
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Backend Unit Tests
+      run: PYTHONPATH=backend pytest backend/tests
+
+    # ----- Node Frontend -----
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Frontend Dependencies
+      working-directory: frontend
+      run: npm ci
+
+    - name: Run Frontend Tests
+      working-directory: frontend
+      run: npm test
+
+    - name: Build Frontend
+      working-directory: frontend
+      run: npm run build
+
+    # ----- Docker & Push to ECR -----
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build & Push Backend Image (Git SHA Tag)
+      run: |
+        docker build -t ${{ secrets.ECR_BACKEND_REPO }}:${{ env.IMAGE_TAG }} ./backend
+        docker push ${{ secrets.ECR_BACKEND_REPO }}:${{ env.IMAGE_TAG }}
+
+    - name: Build & Push Frontend Image (Git SHA Tag)
+      run: |
+        docker build -t ${{ secrets.ECR_FRONTEND_REPO }}:${{ env.IMAGE_TAG }} ./frontend
+        docker push ${{ secrets.ECR_FRONTEND_REPO }}:${{ env.IMAGE_TAG }}
+
+    # ----- Update ECS Task Definition -----
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: nodejs-app-task-definition.json
+        container-name: nodejs-app
+        image: ${{ secrets.ECR_FRONTEND_REPO }}:${{ env.IMAGE_TAG }}
+
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: nodejs-app-service
+        cluster: DevCluster
+        wait-for-service-stability: true
